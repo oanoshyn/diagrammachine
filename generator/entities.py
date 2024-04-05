@@ -1,5 +1,3 @@
-from _ast import Constant
-
 from astroid import (
     AnnAssign,
     Assign,
@@ -7,6 +5,7 @@ from astroid import (
     BinOp,
     Call,
     ClassDef,
+    Const,
     Dict,
     FunctionDef,
     List,
@@ -95,13 +94,14 @@ class Attribute:
 
         attribute_node_value = self.attribute_node.value
 
-        if isinstance(attribute_node_value, Constant):
+        if isinstance(attribute_node_value, Const):
             attribute_type = type(attribute_node_value.value).__name__
         elif isinstance(attribute_node_value, (List, Dict, Set, Tuple)):
             # We cast to lower since the ast types for the collections are uppercase
             attribute_type = type(attribute_node_value).__name__.lower()
         elif isinstance(self.attribute_node.value, Call):
-            attribute_type = attribute_node_value.func.name
+            inferred_node = _infer(attribute_node_value.func)
+            attribute_type = inferred_node.name
 
         return attribute_type
 

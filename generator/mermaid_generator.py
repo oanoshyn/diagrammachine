@@ -12,6 +12,7 @@ from astroid import (
     Subscript,
 )
 from entities import Attribute, Function
+from utils import _infer
 
 diagram_template = """---
 title: {name}
@@ -217,11 +218,8 @@ class AstMermaidGenerator:
 
                 parents = []
                 for parent in node.bases:
-                    if isinstance(parent, Subscript):
-                        if isinstance(parent.value, Name):
-                            parents.append(parent.value.name)
-                    elif isinstance(parent, Name):
-                        parents.append(parent.name)
+                    inferred_node = _infer(parent)
+                    parents.append(inferred_node.name)
 
                 class_info = name, parents, attributes, functions
 
