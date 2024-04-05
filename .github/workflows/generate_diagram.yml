@@ -1,0 +1,85 @@
+on: issue_comment
+
+jobs:
+  draw_diagram_request:
+    # This job only runs for pull request comments
+    name: Diagram request
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      
+      - name: Set execute permission on script
+        run: chmod +x ast_mermaid_generator.py
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Extract base brunch name
+        id: extract_base_branch
+        run: |
+          base_branch=$(git rev-parse --abbrev-ref HEAD)
+          echo $base_branch
+          echo "::set-output name=base_branch::$base_branch"
+
+      
+      - name: Extract PR branch name
+        id: extract_pr_branch
+        run: echo ::set-output name=pr_branch::$(gh pr view $PR_NO --repo $REPO --json headRefName --jq '.headRefName')
+        env:
+          REPO: ${{ github.repository }}
+          PR_NO: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.extract_pr_branch.outputs.pr_branch }}
+      
+      - name: List changed files
+        id: list_changed_files
+        run: |
+          base_branch="${{ steps.extract_base_branch.outputs.base_branch }}"
+          pr_branch="${{ steps.extract_pr_branch.outputs.pr_branch }}"
+          git fetch origin $base_branch
+          changed_files=$(git diff --name-only FETCH_HEAD)
+          echo "Changed files $changed_files"
+          absolute_paths=""
+          separator="++"
+          for file in $changed_files; do
+            absolute_paths="$absolute_paths$GITHUB_WORKSPACE/$file$separator"
+          done
+          absolute_paths=${absolute_paths%$separator}
+          echo "::set-output name=absolute_paths::$absolute_paths"
+
+      - name: generate mermaid diagram
+        id: generate_markdown
+        run: |
+         absolute_paths="${{ steps.list_changed_files.outputs.absolute_paths }}"
+         markdown=$(python ast_mermaid_generator.py --path $absolute_paths --project_path $GITHUB_WORKSPACE)
+         # Set the output variable
+         echo $markdown
+         echo "::set-output name=markdown::$(echo "$markdown" | base64 -w 0)"
+
+      - name: draw a diagram
+        if: contains(github.event.comment.body, 'Generate Diagram')
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const mermaid_markdown = Buffer.from('${{ steps.generate_markdown.outputs.markdown }}', 'base64').toString('utf-8');
+            const message = `\`\`\`mermaid\n${mermaid_markdown}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            })
