@@ -1,6 +1,6 @@
-from typing import Callable, Any
+from typing import Any, Callable
 
-from astroid import NodeNG, InferenceError
+from astroid import InferenceError, NodeNG
 from astroid.typing import InferenceResult
 
 

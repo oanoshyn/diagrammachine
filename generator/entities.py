@@ -1,11 +1,21 @@
 from _ast import Constant
 
-import astroid
-from astroid import AssignAttr, AnnAssign, Assign, List, Dict, Set, Tuple, Call, Subscript, Name, \
-    BinOp, FunctionDef, ClassDef, InferenceError, NodeNG
-from astroid.typing import InferenceResult
-
-from generator.utils import _infer, default_return
+from astroid import (
+    AnnAssign,
+    Assign,
+    AssignAttr,
+    BinOp,
+    Call,
+    ClassDef,
+    Dict,
+    FunctionDef,
+    List,
+    Name,
+    Set,
+    Subscript,
+    Tuple,
+)
+from utils import _infer, default_return
 
 
 class Attribute:
@@ -105,7 +115,6 @@ class Attribute:
             3) BinOp when attribute has type union as annotation (e.g. attr1: str | int)
         """
 
-
         attribute_node_annotation = self.attribute_node.annotation
 
         if isinstance(attribute_node_annotation, Name):
@@ -118,7 +127,9 @@ class Attribute:
         if isinstance(inferred_node, ClassDef):
             annotation_label = inferred_node.name
             if inferred_node.type_params:
-                class_type_parameters = [param.name.name for param in inferred_node.type_params]
+                class_type_parameters = [
+                    param.name.name for param in inferred_node.type_params
+                ]
                 return annotation_label + "[" + ", ".join(class_type_parameters) + "]"
 
             return annotation_label

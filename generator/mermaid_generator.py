@@ -2,8 +2,15 @@ import os
 
 import astroid
 import click
-from astroid import ImportFrom, ClassDef, Assign, AnnAssign, FunctionDef, Subscript, Name
-
+from astroid import (
+    AnnAssign,
+    Assign,
+    ClassDef,
+    FunctionDef,
+    ImportFrom,
+    Name,
+    Subscript,
+)
 from entities import Attribute, Function
 
 diagram_template = """---
@@ -142,7 +149,9 @@ class AstMermaidGenerator:
 
         return classes_info
 
-    def _get_parents_info_from_imports(self, parents: list[ClassName], imports) -> list[ClassInfo]:
+    def _get_parents_info_from_imports(
+        self, parents: list[ClassName], imports
+    ) -> list[ClassInfo]:
         """
         Get ClassInfo objects for all classes from file's imports
         """
@@ -225,7 +234,6 @@ class AstMermaidGenerator:
 
         return classes_info, classes_parents, imports
 
-
     def extract_instance_attributes(self, class_node: ClassDef) -> list[Attribute]:
         """
         Get the list of class instance attributes
@@ -233,10 +241,9 @@ class AstMermaidGenerator:
 
         attributes = []
         for instance_attr in list(class_node.instance_attrs.values()):
-           for attr in instance_attr:
-               attributes.append(Attribute(attr))
+            for attr in instance_attr:
+                attributes.append(Attribute(attr))
         return attributes
-
 
     def parse_file(self, absolute_file_path: str):
         """
@@ -246,17 +253,11 @@ class AstMermaidGenerator:
         parsed_ast = None
 
         try:
-            parsed_ast = astroid.parse(
-                open(
-                    absolute_file_path, "r"
-                ).read()
-            )
+            parsed_ast = astroid.parse(open(absolute_file_path, "r").read())
 
         except SyntaxError as err:
             # In case of a syntax error print the file name and error
-            click.echo(
-                message=f"Failed to parse {absolute_file_path}"
-            )
+            click.echo(message=f"Failed to parse {absolute_file_path}")
 
         return parsed_ast
 
