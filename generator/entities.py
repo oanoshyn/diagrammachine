@@ -1,17 +1,11 @@
-from _ast import (
-    AnnAssign,
-    Assign,
-    Constant,
-    Subscript,
-    Name,
-    BinOp,
-    FunctionDef,
-    Set,
-    Dict,
-    List,
-    Tuple,
-    Call,
-)
+from _ast import Constant
+
+import astroid
+from astroid import AssignAttr, AnnAssign, Assign, List, Dict, Set, Tuple, Call, Subscript, Name, \
+    BinOp, FunctionDef, ClassDef, InferenceError, NodeNG
+from astroid.typing import InferenceResult
+
+from generator.utils import _infer, default_return
 
 
 class Attribute:
@@ -23,36 +17,43 @@ class Attribute:
         2) AnnAssign, when attribute has both value and type annotation
     """
 
-    def __init__(self, attribute_node: AnnAssign | Assign):
+    def __init__(self, attribute_node: AnnAssign | Assign | AssignAttr):
         self.attribute_node = attribute_node
 
     @property
+    @default_return(default_value="")
     def name(self) -> str:
         """
         Get the name of the attribute from ast node
 
         Depending on the attribute type we have to handle them separately since they have different
         structure
+
+        All exceptions are handled by default_return decorator returning a default value
         """
 
         match self.attribute_node:
             # Attribute with a value and no type annotation
             case self.attribute_node if isinstance(self.attribute_node, Assign):
-                return self.attribute_node.targets[0].id
+                return self.attribute_node.targets[0].name
 
             # Attribute with value and type annotation
             case self.attribute_node if isinstance(self.attribute_node, AnnAssign):
-                return self.attribute_node.target.id
+                return self.attribute_node.target.name
 
-        return ""
+            case self.attribute_node if isinstance(self.attribute_node, AssignAttr):
+                return self.attribute_node.attrname
 
     @property
+    @default_return(default_value="")
     def type_annotation(self) -> str:
         """
         Get the type annotation of the attribute from ast node
 
         Depending on the attribute type we have to handle them separately since they have different
         structure
+
+        All exceptions are handled by default_return decorator returning a default value
         """
 
         match self.attribute_node:
@@ -64,7 +65,9 @@ class Attribute:
             case self.attribute_node if isinstance(self.attribute_node, AnnAssign):
                 return self._extract_type_from_AnnAssign_node()
 
-        return ""
+            # Instance attribute
+            case self.attribute_node if isinstance(self.attribute_node, AssignAttr):
+                return self._extract_type_from_AssignAttr()
 
     def _extract_type_from_Assign_node(self) -> str:
         """
@@ -88,7 +91,7 @@ class Attribute:
             # We cast to lower since the ast types for the collections are uppercase
             attribute_type = type(attribute_node_value).__name__.lower()
         elif isinstance(self.attribute_node.value, Call):
-            attribute_type = attribute_node_value.func.id
+            attribute_type = attribute_node_value.func.name
 
         return attribute_type
 
@@ -102,37 +105,36 @@ class Attribute:
             3) BinOp when attribute has type union as annotation (e.g. attr1: str | int)
         """
 
-        # For Subscript types (e.g. dict[str, Any]) get the type without parameters
-        # dict[str, Any] -> dict
-        attribute_type = ""
-        if isinstance(self.attribute_node.annotation, Subscript):
-            if isinstance(self.attribute_node.value, Name):
-                attribute_type = self.attribute_node.value.id
-            if isinstance(self.attribute_node.annotation.value, Name):
-                attribute_type = self.attribute_node.annotation.value.id
 
-        # For attributes that have annotations only get the type name
-        elif isinstance(self.attribute_node.annotation, Name):
-            attribute_type = self.attribute_node.annotation.id
+        attribute_node_annotation = self.attribute_node.annotation
 
-        # For union types(e.g. <type> | <type> | <type> |...) get first two members
-        # This can be improved to handle more union members
-        elif isinstance(self.attribute_node.annotation, BinOp):
-            left_type = self.attribute_node.annotation.left
-            right_type = self.attribute_node.annotation.right
+        if isinstance(attribute_node_annotation, Name):
+            return attribute_node_annotation.name
 
-            if isinstance(left_type, Name):
-                left_type = left_type.id
-            elif isinstance(left_type, Constant):
-                left_type = left_type.value
+        if isinstance(attribute_node_annotation, (Subscript, BinOp)):
+            return attribute_node_annotation.as_string()
 
-            if isinstance(right_type, Name):
-                right_type = right_type.id
-            elif isinstance(right_type, Constant):
-                right_type = right_type.value
-            attribute_type = f"{left_type} | {right_type}"
+        inferred_node = _infer(attribute_node_annotation)
+        if isinstance(inferred_node, ClassDef):
+            annotation_label = inferred_node.name
+            if inferred_node.type_params:
+                class_type_parameters = [param.name.name for param in inferred_node.type_params]
+                return annotation_label + "[" + ", ".join(class_type_parameters) + "]"
 
-        return attribute_type
+            return annotation_label
+
+        return ""
+
+    def _extract_type_from_AssignAttr(self) -> str:
+        """"""
+
+        assert isinstance(self.attribute_node, AssignAttr)
+
+        if isinstance(self.attribute_node.parent, AnnAssign):
+            self.attribute_node = self.attribute_node.parent
+            return self._extract_type_from_AnnAssign_node()
+
+        return ""
 
 
 class Function:
