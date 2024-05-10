@@ -1,4 +1,6 @@
-on: issue_comment
+on:
+  issue_comment:
+      types: [created]
 
 jobs:
   draw_diagram_request:
@@ -64,7 +66,7 @@ jobs:
         id: generate_markdown
         run: |
          absolute_paths="${{ steps.list_changed_files.outputs.absolute_paths }}"
-         markdown=$(python ast_mermaid_generator.py --path $absolute_paths --project_path $GITHUB_WORKSPACE)
+         markdown=$(python generator/mermaid_generator.py --path $absolute_paths --project_path $GITHUB_WORKSPACE)
          # Set the output variable
          echo $markdown
          echo "::set-output name=markdown::$(echo "$markdown" | base64 -w 0)"
