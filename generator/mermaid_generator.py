@@ -1,5 +1,5 @@
 import os
-
+import sys
 import astroid
 import click
 from astroid import (
@@ -8,8 +8,6 @@ from astroid import (
     ClassDef,
     FunctionDef,
     ImportFrom,
-    Name,
-    Subscript,
 )
 from entities import Attribute, Function
 from utils import _infer
@@ -28,6 +26,7 @@ class {class_name} {{
 }}
 """
 
+sys.path.append(".")
 
 ClassName = str
 ClassInfo = tuple[ClassName, list[Attribute], list[Function]]
